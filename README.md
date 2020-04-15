@@ -1,3 +1,6 @@
+![Algorithm schema](./project_ Airflow data monitoring DAG.docx)
+
+
 ### Set up credentials
 Before docker compose up -d execuion you need to provide credentials.
 create .env file with fillowing content(example values):
