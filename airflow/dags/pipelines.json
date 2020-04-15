@@ -1,0 +1,65 @@
+{
+	"pipelines": [
+		{
+			"code": "postgres-monitoring",
+			"project": "airflow-monitoring",
+			"flow": "tableA | inventory-distribution",
+			"description": "",
+			"arguments": {
+				"dag": {
+					"start-date": "",
+					"schedule": "0 * * * *"
+				}
+			},
+			"source": {
+				"type": "postgres",
+				"connection": {
+            				"declaration": "explicit",
+            				"hostname": "localhost",
+            				"port": 5432,
+            				"database": "pipelines_test",
+            				"username": "airflow",
+            				"password": "airflow"
+		                               },			
+                                        "sqlQuery": "SELECT phone, firstname, lastname, address, FROM phonebook;"
+			},
+			"target": {
+				"type": "elasticsearch",
+				"connection": {
+					"declaration": "explicit",
+
+					"url": "https://hostname",
+					"index": "inventory-distribution",
+					"type": "inventory",
+					"login": "dbuser",
+					"passwordKeyPath": "/some/key/store/path"
+				}
+			}
+		},
+		{
+			"code": "hive-tableA-monitoring",
+			"project": "SomeMigration",
+			"flow": "tableB | inventory-subordinat-X",
+			"description": "",
+			"arguments": {
+				"start-date": "",
+				"schedule": "0 * * * *"
+			},
+			"source": {
+				"type": "hive",
+				"connection": {
+					"declaration": "implicit",
+					"id": "hive-connection-id-A"
+				},
+				"sqlQuery": "SELECT * FROM schemaA.tableB where datetimeField >= {{ ds }}"
+			},
+			"target": {
+				"type": "elasticsearch",
+				"connection": {
+					"declaration": "implicit",
+					"id": "elasticsearch-inventory-id"
+				}
+			}
+		}
+	]
+}

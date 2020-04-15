@@ -1,0 +1,37 @@
+{
+    "code": "postgres-monitoring",
+    "project": "airflow-monitoring",
+    "owner": "brig",
+    "flow": "qlogs",
+    "description": "this monitoring dag controls metrics gathering from logs",
+    "_schedule": "0 * * * *",
+    "source": {
+        "type": "postgres",
+        "connection": {
+            "declaration": "explicit",
+            "hostname": "localhost",
+            "port": 5432,
+            "database": "pipelines_test",
+            "username": "airflow",
+            "password": "airflow"
+        },
+        "sqlQuery": "SELECT phone, firstname, lastname, address, FROM phonebook;"
+    },
+    "target": {
+        "type": "elasticsearch",
+        "connection": {
+            "declaration": "implicit",
+            "id": "elastic-monitoring",
+            "login": "dbuser",
+            "passwordKeyPath": "/some/key/store/path"
+        },
+        "index": "inventory-distribution",
+        "index-type": "inventory"
+    }
+}
+
+
+
+
+
+

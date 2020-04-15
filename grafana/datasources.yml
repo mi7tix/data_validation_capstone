@@ -1,0 +1,17 @@
+apiVersion: 1
+
+datasources:
+  - name: elasticsearch
+    type: elasticsearch
+    access: proxy
+    database: "*"
+    url: http://elasticsearch:9200
+    basicAuth: true
+    basicAuthUser: ${ES_USERNAME}
+    basicAuthPassword: ${ES_PASSWORD}
+    jsonData:
+      interval: Hourly
+      timeField: "@timestamp"
+      esVersion: 70
+      logMessageField: message
+      logLevelField: fields.level

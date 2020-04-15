@@ -1,0 +1,189 @@
+version: '2.1'
+services:
+    redis:
+        image: 'redis:5.0.5'
+        container_name: redis
+
+    postgres:
+        image: postgres:9.6
+        container_name: postgres
+        environment:
+            - POSTGRES_USER=${PG_AIRFLOW_USER}
+            - POSTGRES_PASSWORD=${PG_AIRFLOW_PASSWD}
+            - POSTGRES_DB=${PG_AIRFLOW_DB}
+        volumes:
+            - postgres-data:/var/lib/postgresql/data
+
+    initdb:
+       image: puckel/docker-airflow:${AIRFLOW_VERSION}
+       entrypoint: airflow initdb
+       container_name: initdb
+       restart: on-failure
+       depends_on:
+            - postgres
+            - redis
+       environment:
+            - EXECUTOR=Celery
+            - FERNET_KEY=${AIRFLOW_FERNET_KEY}
+            - AIRFLOW__WEBSERVER__RBAC=true
+            - LOAD_EX=n
+            - POSTGRES_USER=${PG_AIRFLOW_USER}
+            - POSTGRES_PASSWORD=${PG_AIRFLOW_PASSWD}
+            - POSTGRES_DB=${PG_AIRFLOW_DB}
+       volumes:
+        - ./requirements.txt:/requirements.txt
+
+    createuser:
+       image: puckel/docker-airflow:${AIRFLOW_VERSION}
+       entrypoint: airflow create_user -r Admin -u ${DMD_USER_USERNAME} -e ${DMD_USER_EMAIL} -f ${DMD_USER_USERNAME} -l ${DMD_USER_USERNAME} -p ${DMD_USER_PASSWD}
+       container_name: createuser
+       restart: on-failure
+       depends_on:
+            - initdb
+       environment:
+            - EXECUTOR=Celery
+            - FERNET_KEY=${AIRFLOW_FERNET_KEY}
+            - AIRFLOW__WEBSERVER__RBAC=true
+            - LOAD_EX=n
+            - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgres://${PG_AIRFLOW_USER}:${PG_AIRFLOW_PASSWD}@postgres:5432/${PG_AIRFLOW_DB}
+       volumes:
+        - ./requirements.txt:/requirements.txt
+        - ./webserver_config.py:/usr/local/airflow/webserver_config.py
+
+    webserver:
+        image: puckel/docker-airflow:${AIRFLOW_VERSION}
+        container_name: webserver
+        hostname: webserver
+        restart: always
+        depends_on:
+            - initdb
+        environment:
+            - LOAD_EX=y
+            - FERNET_KEY=${AIRFLOW_FERNET_KEY}
+            - AIRFLOW__WEBSERVER__RBAC=true
+            - EXECUTOR=Celery
+            - POSTGRES_USER=${PG_AIRFLOW_USER}
+            - POSTGRES_PASSWORD=${PG_AIRFLOW_PASSWD}
+            - POSTGRES_DB=${PG_AIRFLOW_DB}
+        volumes:
+            - ./airflow/dags:/usr/local/airflow/dags
+            - ./requirements.txt:/requirements.txt
+        ports:
+            - "8080:8080"
+        command: webserver
+        healthcheck:
+            test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
+            interval: 30s
+            timeout: 30s
+            retries: 3
+
+    flower:
+        image: puckel/docker-airflow:${AIRFLOW_VERSION}
+        container_name: flower
+        hostname: flower
+        restart: always
+        depends_on:
+            - redis
+        environment:
+            - EXECUTOR=Celery
+        ports:
+            - "5555:5555"
+        command: flower --basic_auth=${DMD_USER_USERNAME}:${DMD_USER_PASSWD}
+
+    scheduler:
+        image: puckel/docker-airflow:${AIRFLOW_VERSION}
+        container_name: scheduler
+        restart: always
+        depends_on:
+            - webserver
+        volumes:
+            - ./airflow/dags:/usr/local/airflow/dags
+            - ./requirements.txt:/requirements.txt
+        environment:
+            - LOAD_EX=y
+            - FERNET_KEY=${AIRFLOW_FERNET_KEY}
+            - AIRFLOW__WEBSERVER__RBAC=true
+            - EXECUTOR=Celery
+            - POSTGRES_USER=${PG_AIRFLOW_USER}
+            - POSTGRES_PASSWORD=${PG_AIRFLOW_PASSWD}
+            - POSTGRES_DB=${PG_AIRFLOW_DB}
+            # - REDIS_PASSWORD=redispass
+        command: scheduler
+
+    worker:
+        image: puckel/docker-airflow:${AIRFLOW_VERSION}
+        container_name: worker
+        hostname: worker
+        restart: always
+        depends_on:
+            - scheduler
+        volumes:
+            - ./airflow/dags:/usr/local/airflow/dags
+            - ./requirements.txt:/requirements.txt
+        environment:
+            - FERNET_KEY=${AIRFLOW_FERNET_KEY}
+            - EXECUTOR=Celery
+            - POSTGRES_USER=${PG_AIRFLOW_USER}
+            - POSTGRES_PASSWORD=${PG_AIRFLOW_PASSWD}
+            - POSTGRES_DB=${PG_AIRFLOW_DB}
+            # - REDIS_PASSWORD=redispass
+        command: worker
+    elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:${ES_VERSION}
+        container_name: elasticsearch
+        ports:
+            - 9200:9200
+            - 9300:9300
+        environment:
+            - discovery.type=single-node
+            - ELASTIC_PASSWORD=${ES_PASSWORD}
+            - xpack.security.enabled=false
+            - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+            - ELASTICSEARCH_USERNAME=${ES_USERNAME}
+        ulimits:
+            memlock:
+              soft: -1
+              hard: -1
+            nofile:
+              soft: 65536
+              hard: 65536
+        cap_add:
+            - IPC_LOCK
+        volumes:
+            - elasticsearch-data:/usr/share/elasticsearch/data
+
+    kibana:
+        container_name: kibana
+        image: docker.elastic.co/kibana/kibana:${ES_VERSION}
+        environment:
+            - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+            - ELASTICSEARCH_USERNAME=${ES_USERNAME}
+            - ELASTICSEARCH_PASSWORD=${ES_PASSWORD}
+            - discovery.type=single-node
+            - xpack.watcher.enabled=false
+        ports:
+            - 5601:5601
+        depends_on:
+            - elasticsearch
+
+    grafana:
+        image: grafana/grafana:6.7.1-ubuntu
+        container_name: grafana
+        ports:
+            - 3000:3000
+        user: "472"
+        volumes:
+            - grafana-data:/var/lib/grafana
+        environment:
+            - GF_SECURITY_ADMIN_USER=${DMD_USER_USERNAME}
+            - GF_SECURITY_ADMIN_PASSWORD=${DMD_USER_PASSWD}
+            - ES_USERNAME=${ES_USERNAME}
+            - ES_PASSWORD=${ES_PASSWORD}
+
+volumes:
+  elasticsearch-data:
+    driver: local
+  grafana-data:
+    driver: local
+  postgres-data:
+    driver: local
