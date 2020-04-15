@@ -1,4 +1,4 @@
-![Algorithm schema](./project_ Airflow data monitoring DAG.docx)
+![text](./project_ Airflow data monitoring DAG.docx)
 
 
 ### Set up credentials
