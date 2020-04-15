@@ -1,4 +1,3 @@
-![text](./project_ Airflow data monitoring DAG.docx)
 
 
 ### Set up credentials
