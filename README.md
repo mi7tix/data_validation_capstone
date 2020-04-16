@@ -1,4 +1,4 @@
-
+Capstone demo includes only one Postgres-Elastic pipline Operator. You can add any additional at *Airflow-Variables [pipelines]*
 
 ### Set up credentials
 Before docker compose up -d execuion you need to provide credentials.
